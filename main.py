@@ -1,8 +1,9 @@
 ﻿from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pymongo import MongoClient
 from datetime import datetime
 import os
+import json
 from dotenv import load_dotenv
 from typing import List, Optional
 from pydantic import BaseModel
@@ -18,7 +19,7 @@ app = FastAPI(
 )
 
 # MongoDB 連線設定
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb+srv://ruby04hung_db_user: 5x80COx9fuhB4Kak @cluster0.qoknrio.mongodb.net/?appName=Cluster0")
+MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
 client = MongoClient(MONGODB_URL)
 db = client["emogo_db"]
 
@@ -368,6 +369,16 @@ def root():
                         </div>
                         <a href="/export" class="btn" target="_blank">測試此端點</a>
                     </div>
+
+                    <!-- 下載數據端點 -->
+                    <div class="endpoint-card">
+                        <h3>💾 下載數據檔案</h3>
+                        <div class="endpoint-path">GET /download</div>
+                        <div class="endpoint-desc">
+                            下載所有數據（vlogs, emotions, GPS）為 JSON 檔案。
+                        </div>
+                        <a href="/download" class="btn" style="background: #28a745;">下載數據</a>
+                    </div>
                     
                     <!-- 健康檢查 -->
                     <div class="endpoint-card">
@@ -476,6 +487,49 @@ def export_all():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"匯出失敗: {str(e)}")
 
+# 新增：下載端點 - 專門提供檔案下載
+@app.get("/download")
+async def download_data():
+    """下載所有數據為 JSON 檔案"""
+    try:
+        # 從 MongoDB 取得所有數據
+        vlogs = list(vlogs_collection.find({}, {"_id": 0}))
+        emotions = list(emotions_collection.find({}, {"_id": 0}))
+        gps = list(gps_collection.find({}, {"_id": 0}))
+        
+        response_data = {
+            "metadata": {
+                "export_time": datetime.now().isoformat(),
+                "student": "洪于茹",
+                "student_id": "R14546007",
+                "data_types": ["vlogs", "emotions", "gps"],
+                "total_records": len(vlogs) + len(emotions) + len(gps),
+                "assignment": "Week 13 - EmoGo Backend",
+                "data_source": "MongoDB Atlas"
+            },
+            "data": {
+                "vlogs": vlogs,
+                "emotions": emotions,
+                "gps": gps
+            }
+        }
+        
+        # 轉換為 JSON 字串
+        json_str = json.dumps(response_data, ensure_ascii=False, indent=2)
+        
+        # 回傳下載檔案
+        filename = f"emogo_data_洪于茹_R14546007_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        return Response(
+            content=json_str,
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"下載失敗: {str(e)}")
+
 # 健康檢查端點
 @app.get("/health")
 def health():
@@ -496,6 +550,7 @@ def health():
         "endpoints": {
             "home": "/",
             "export": "/export",
+            "download": "/download",
             "health": "/health",
             "docs": "/docs",
             "vlogs": "/vlogs",
