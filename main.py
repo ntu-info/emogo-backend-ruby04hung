@@ -514,17 +514,20 @@ async def download_data():
             }
         }
         
-        # 轉換為 JSON 字串，確保中文正確編碼
+        # 直接回傳 JSONResponse，讓瀏覽器處理下載
+        import json
+        from fastapi.responses import JSONResponse
+        
+        # 建立 JSON 字串
         json_str = json.dumps(response_data, ensure_ascii=False, indent=2)
         
-        # 回傳下載檔案，設定正確的編碼
-        filename = f"emogo_data_洪于茹_R14546007_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        # 使用 bytes 轉換並指定 UTF-8 編碼
+        # 建立回應
+        from fastapi.responses import Response
         return Response(
-            content=json_str.encode('utf-8'),  # 關鍵修改：轉為 bytes 並指定編碼
-            media_type="application/json; charset=utf-8",  # 指定 charset
+            content=json_str,
+            media_type="application/json",
             headers={
-                "Content-Disposition": f"attachment; filename*=UTF-8''{filename}"
+                "Content-Disposition": "attachment; filename=emogo_data.json"
             }
         )
     
