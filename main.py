@@ -514,16 +514,17 @@ async def download_data():
             }
         }
         
-        # 轉換為 JSON 字串
+        # 轉換為 JSON 字串，確保中文正確編碼
         json_str = json.dumps(response_data, ensure_ascii=False, indent=2)
         
-        # 回傳下載檔案
+        # 回傳下載檔案，設定正確的編碼
         filename = f"emogo_data_洪于茹_R14546007_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        # 使用 bytes 轉換並指定 UTF-8 編碼
         return Response(
-            content=json_str,
-            media_type="application/json",
+            content=json_str.encode('utf-8'),  # 關鍵修改：轉為 bytes 並指定編碼
+            media_type="application/json; charset=utf-8",  # 指定 charset
             headers={
-                "Content-Disposition": f"attachment; filename={filename}"
+                "Content-Disposition": f"attachment; filename*=UTF-8''{filename}"
             }
         )
     
