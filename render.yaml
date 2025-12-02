@@ -1,9 +1,9 @@
-services:
-  # A Docker web service
+﻿services:
   - type: web
-    name: fastapi-example
-    runtime: python
-    plan: free
-    autoDeploy: false
+    name: emogo-backend-ruby04hung
+    env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 10000
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
