@@ -8,6 +8,9 @@ import urllib.parse
 from dotenv import load_dotenv
 from typing import List, Optional
 from pydantic import BaseModel
+import zipfile
+import tempfile
+import shutil
 
 # 載入環境變數
 load_dotenv()
@@ -243,6 +246,15 @@ def root():
                 background: #5a6268;
             }}
             
+            .btn-video {{
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            }}
+            
+            .btn-video:hover {{
+                background: linear-gradient(135deg, #e91e63 0%, #9c27b0 100%);
+                box-shadow: 0 5px 15px rgba(233, 30, 99, 0.4);
+            }}
+            
             .data-types {{
                 display: grid;
                 grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -314,6 +326,20 @@ def root():
                 }}
             }}
         </style>
+        <script>
+            function showDownloadingMessage(event) {{
+                event.preventDefault();
+                const url = event.target.href;
+                
+                // 顯示提示訊息
+                if (url.includes('/download/videos')) {{
+                    alert('正在準備影片壓縮檔，請稍候...\\n下載完成後會自動儲存為 ZIP 檔案。');
+                }}
+                
+                // 開始下載
+                window.location.href = url;
+            }}
+        </script>
     </head>
     <body>
         <div class="container">
@@ -383,6 +409,17 @@ def root():
                             下載所有數據（vlogs, emotions, GPS）為 JSON 檔案。
                         </div>
                         <a href="/download" class="btn" style="background: #28a745;">下載數據</a>
+                    </div>
+                    
+                    <!-- 下載影片壓縮檔 -->
+                    <div class="endpoint-card">
+                        <h3>🎬 下載所有影片</h3>
+                        <div class="endpoint-path">GET /download/videos</div>
+                        <div class="endpoint-desc">
+                            下載所有影片檔案（vlogs）為 ZIP 壓縮檔。<br>
+                            <strong>直接點擊即可下載影片檔案！</strong>
+                        </div>
+                        <a href="/download/videos" class="btn btn-video" onclick="showDownloadingMessage(event)">下載影片壓縮檔</a>
                     </div>
                     
                     <!-- 健康檢查 -->
@@ -534,6 +571,75 @@ async def download_data():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"下載失敗: {str(e)}")
 
+# ========== 下載所有影片壓縮檔 ==========
+@app.get("/download/videos")
+async def download_all_videos():
+    """
+    下載所有影片為 ZIP 壓縮檔
+    這是老師要求的新功能
+    """
+    try:
+        # 1. 檢查影片資料夾是否存在
+        if not os.path.exists(VIDEO_DIR):
+            raise HTTPException(
+                status_code=404, 
+                detail=f"影片資料夾未找到：{VIDEO_DIR}"
+            )
+        
+        # 2. 取得所有影片檔案
+        video_files = []
+        valid_extensions = ('.mp4', '.avi', '.mov', '.mkv', '.webm')
+        
+        for file in os.listdir(VIDEO_DIR):
+            if file.lower().endswith(valid_extensions):
+                video_files.append(file)
+        
+        if not video_files:
+            raise HTTPException(
+                status_code=404, 
+                detail="沒有找到任何影片檔案"
+            )
+        
+        # 3. 建立臨時壓縮檔
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_filename = f"emogo_videos_{timestamp}.zip"
+        
+        # 使用臨時檔案
+        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_zip:
+            zip_path = tmp_zip.name
+            
+            # 4. 建立 ZIP 檔案
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for video_file in video_files:
+                    video_path = os.path.join(VIDEO_DIR, video_file)
+                    
+                    # 檢查檔案是否存在
+                    if os.path.exists(video_path):
+                        # 將檔案加入 ZIP，只保留檔名
+                        zipf.write(video_path, arcname=video_file)
+                        print(f"📦 加入影片到 ZIP: {video_file}")
+        
+        # 5. 計算檔案大小
+        file_size = os.path.getsize(zip_path)
+        
+        print(f"✅ ZIP 檔案建立成功：{zip_filename} ({file_size} bytes)")
+        
+        # 6. 回傳壓縮檔
+        return FileResponse(
+            path=zip_path,
+            filename=zip_filename,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename={zip_filename}",
+                "Content-Type": "application/zip"
+            }
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"建立影片壓縮檔失敗: {str(e)}")
+
 # 健康檢查端點
 @app.get("/health")
 def health():
@@ -547,7 +653,7 @@ def health():
     # 檢查影片資料夾
     video_files = []
     if os.path.exists(VIDEO_DIR):
-        video_files = [f for f in os.listdir(VIDEO_DIR) if f.endswith('.mp4')]
+        video_files = [f for f in os.listdir(VIDEO_DIR) if f.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.webm'))]
 
     return {
         "status": "healthy",
@@ -565,6 +671,7 @@ def health():
             "home": "/",
             "export": "/export",
             "download": "/download",
+            "download_videos": "/download/videos",
             "health": "/health",
             "docs": "/docs",
             "vlogs": "/vlogs",
