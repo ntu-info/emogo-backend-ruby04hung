@@ -574,10 +574,9 @@ def health():
             "docs": "/docs",
             "vlogs": "/vlogs",
             "emotions": "/emotions",
-            "gps": "/gps"
+            "gps": "/gps",
             "videos_list": "/videos",
             "video_download": "/videos/{video_id}"
-
         }
     }
 
@@ -687,7 +686,7 @@ def startup_event():
                     "description": "1-second video recording - Happy moment",
                     "timestamp": datetime.now().isoformat(),
                     "student": "洪于茹",
-                    "student_id": "R14546007"
+                    "student_id": "R14546007",
                     "video_filename": "vlog_001.mp4",
                     "video_download_url": f"{BASE_URL}/videos/vlog_001"
                 },
@@ -696,7 +695,7 @@ def startup_event():
                     "description": "1-second video recording - Study session",
                     "timestamp": datetime.now().isoformat(),
                     "student": "洪于茹",
-                    "student_id": "R14546007"
+                    "student_id": "R14546007",
                     "video_filename": "vlog_002.mp4",
                     "video_download_url": f"{BASE_URL}/videos/vlog_002"
                 }
