@@ -17,12 +17,16 @@
 | 端點 | 方法 | 說明 |
 |------|------|------|
 | `/` | GET | 首頁 (HTML 頁面) |
-| `/export` | GET | **主要需求** - 匯出所有數據 |
+| `/export` | GET | 匯出所有數據 |
 | `/health` | GET | 健康檢查 |
 | `/docs` | GET | Swagger API 文檔 |
 | `/vlogs` | GET | 取得影片數據 |
 | `/emotions` | GET | 取得情緒數據 |
 | `/gps` | GET | 取得位置數據 |
+| `/download` | GET | 下載數據檔案 - 自動下載 JSON 檔案 |
+| `/download/videos` | GET | 下載所有影片為 ZIP 壓縮檔 |
+| `/videos` | GET | 列出所有可下載的影片 |
+| `/videos/{video_id}` | GET | 下載單一影片檔案 |
 
 ## 數據類型
 1. **Vlogs (影片紀錄)** - 1秒鐘情緒影片
@@ -34,6 +38,7 @@
 - **資料庫:** MongoDB Atlas
 - **部署平台:** Render
 - **API 格式:** RESTful JSON
+- **檔案格式:** JSON、MP4、ZIP
 
 ---
 ### 1. GitHub Repository
@@ -48,10 +53,13 @@ https://emogo-backend-ruby04hung.onrender.com/export
 ### 4. 資料下載端點
 https://emogo-backend-ruby04hung.onrender.com/download
 
-### 5. 健康檢查端點（確認 MongoDB 連線）
+### 5. 影片壓縮檔下載
+https://emogo-backend-ruby04hung.onrender.com/download/videos
+
+### 6. 健康檢查端點（確認 MongoDB 連線）
 https://emogo-backend-ruby04hung.onrender.com/health
 
-### 6. API 文檔
+### 7. API 文檔
 https://emogo-backend-ruby04hung.onrender.com/docs
 
 ---
@@ -62,6 +70,7 @@ https://emogo-backend-ruby04hung.onrender.com/docs
 3. ✅ 提供三種類型數據：Vlogs、Emotions、GPS
 4. ✅ 符合作業所有要求
 5. ✅ 部署於 Render 公開伺服器
+
 ---
 
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/e7FBMwSa)
