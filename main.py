@@ -1,9 +1,10 @@
 ﻿from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, FileResponse
 from pymongo import MongoClient
 from datetime import datetime
 import os
 import json
+import urllib.parse
 from dotenv import load_dotenv
 from typing import List, Optional
 from pydantic import BaseModel
@@ -22,6 +23,10 @@ app = FastAPI(
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
 client = MongoClient(MONGODB_URL)
 db = client["emogo_db"]
+
+# 影片相關設定
+BASE_URL = os.getenv("BASE_URL", "https://emogo-backend-ruby04hung.onrender.com")
+VIDEO_DIR = "sample_videos"
 
 # 建立集合
 vlogs_collection = db["vlogs"]
@@ -543,7 +548,12 @@ def health():
         db_status = "connected"
     except Exception as e:
         db_status = f"disconnected: {str(e)}"
-    
+
+    # 檢查影片資料夾
+    video_files = []
+    if os.path.exists(VIDEO_DIR):
+        video_files = [f for f in os.listdir(VIDEO_DIR) if f.endswith('.mp4')]
+
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
@@ -551,6 +561,11 @@ def health():
         "student": "洪于茹 (R14546007)",
         "assignment": "Week 13 - FastAPI + MongoDB",
         "database": db_status,
+        "video_files": {
+            "directory": VIDEO_DIR,
+            "count": len(video_files),
+            "files": video_files
+        },
         "endpoints": {
             "home": "/",
             "export": "/export",
@@ -560,6 +575,9 @@ def health():
             "vlogs": "/vlogs",
             "emotions": "/emotions",
             "gps": "/gps"
+            "videos_list": "/videos",
+            "video_download": "/videos/{video_id}"
+
         }
     }
 
@@ -670,6 +688,8 @@ def startup_event():
                     "timestamp": datetime.now().isoformat(),
                     "student": "洪于茹",
                     "student_id": "R14546007"
+                    "video_filename": "vlog_001.mp4",
+                    "video_download_url": f"{BASE_URL}/videos/vlog_001"
                 },
                 {
                     "id": "vlog_002",
@@ -677,9 +697,11 @@ def startup_event():
                     "timestamp": datetime.now().isoformat(),
                     "student": "洪于茹",
                     "student_id": "R14546007"
+                    "video_filename": "vlog_002.mp4",
+                    "video_download_url": f"{BASE_URL}/videos/vlog_002"
                 }
             ])
-            print("✅ Vlogs 測試數據已插入")
+            print("✅ Vlogs 測試數據已插入（包含影片下載連結）")
         
         if emotions_collection.count_documents({}) == 0:
             emotions_collection.insert_many([
@@ -725,7 +747,158 @@ def startup_event():
             
     except Exception as e:
         print(f"❌ MongoDB 連線失敗: {e}")
+# ========== 影片檔案下載端點 ==========
+@app.get("/videos/{video_id}")
+async def download_video_file(video_id: str):
+    """
+    下載實際的影片檔案
+    範例：GET /videos/vlog_001 會下載 vlog_001.mp4
+    這是老師要求的實際影片下載功能
+    """
+    try:
+        # 檢查影片ID是否有效
+        valid_videos = ["vlog_001", "vlog_002"]
+        
+        if video_id not in valid_videos:
+            raise HTTPException(status_code=404, detail="影片ID不存在")
+        
+        # 影片檔案路徑
+        video_filename = f"{video_id}.mp4"
+        video_path = os.path.join(VIDEO_DIR, video_filename)
+        
+        # 檢查檔案是否存在
+        if not os.path.exists(video_path):
+            raise HTTPException(
+                status_code=404, 
+                detail=f"影片檔案未找到：{video_filename}"
+            )
+        
+        # 檢查檔案大小
+        file_size = os.path.getsize(video_path)
+        
+        print(f"📹 提供影片下載：{video_filename} ({file_size} bytes)")
+        
+        # 回傳影片檔案
+        return FileResponse(
+            video_path,
+            media_type="video/mp4",
+            filename=video_filename,
+            headers={
+                "Content-Disposition": f"attachment; filename={video_filename}"
+            }
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"影片下載失敗: {str(e)}")
 
+# ========== 影片列表端點 ==========
+@app.get("/videos")
+async def list_videos():
+    """
+    列出所有可下載的影片
+    """
+    try:
+        # 從資料庫取得所有影片資訊
+        vlogs = list(vlogs_collection.find({}, {"_id": 0}))
+        
+        videos_list = []
+        for vlog in vlogs:
+            if "video_download_url" in vlog:
+                videos_list.append({
+                    "id": vlog["id"],
+                    "description": vlog["description"],
+                    "timestamp": vlog["timestamp"],
+                    "download_url": vlog["video_download_url"],
+                    "filename": vlog.get("video_filename", "")
+                })
+        
+        return {
+            "count": len(videos_list),
+            "videos": videos_list,
+            "message": f"使用 /videos/{{id}} 下載影片，例如：/videos/vlog_001"
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"取得影片列表失敗: {str(e)}")
+    
+# ========== 影片檔案下載端點 ==========
+@app.get("/videos/{video_id}")
+async def download_video_file(video_id: str):
+    """
+    下載實際的影片檔案
+    範例：GET /videos/vlog_001 會下載 vlog_001.mp4
+    這是老師要求的實際影片下載功能
+    """
+    try:
+        # 檢查影片ID是否有效
+        valid_videos = ["vlog_001", "vlog_002"]
+        
+        if video_id not in valid_videos:
+            raise HTTPException(status_code=404, detail="影片ID不存在")
+        
+        # 影片檔案路徑
+        video_filename = f"{video_id}.mp4"
+        video_path = os.path.join(VIDEO_DIR, video_filename)
+        
+        # 檢查檔案是否存在
+        if not os.path.exists(video_path):
+            raise HTTPException(
+                status_code=404, 
+                detail=f"影片檔案未找到：{video_filename}"
+            )
+        
+        # 檢查檔案大小
+        file_size = os.path.getsize(video_path)
+        
+        print(f"📹 提供影片下載：{video_filename} ({file_size} bytes)")
+        
+        # 回傳影片檔案
+        return FileResponse(
+            video_path,
+            media_type="video/mp4",
+            filename=video_filename,
+            headers={
+                "Content-Disposition": f"attachment; filename={video_filename}"
+            }
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"影片下載失敗: {str(e)}")
+
+# ========== 影片列表端點 ==========
+@app.get("/videos")
+async def list_videos():
+    """
+    列出所有可下載的影片
+    """
+    try:
+        # 從資料庫取得所有影片資訊
+        vlogs = list(vlogs_collection.find({}, {"_id": 0}))
+        
+        videos_list = []
+        for vlog in vlogs:
+            if "video_download_url" in vlog:
+                videos_list.append({
+                    "id": vlog["id"],
+                    "description": vlog["description"],
+                    "timestamp": vlog["timestamp"],
+                    "download_url": vlog["video_download_url"],
+                    "filename": vlog.get("video_filename", "")
+                })
+        
+        return {
+            "count": len(videos_list),
+            "videos": videos_list,
+            "message": f"使用 /videos/{{id}} 下載影片，例如：/videos/vlog_001"
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"取得影片列表失敗: {str(e)}")
+           
 # 應用程式關閉事件
 @app.on_event("shutdown")
 def shutdown_event():
